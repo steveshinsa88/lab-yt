@@ -126,10 +126,12 @@ try{ fbq('init','938001189216764'); fbq('track','PageView'); }catch(e){}
   function setStatus(t,spin){ statusEl.innerHTML=(spin?'<span class="spin"></span>':'')+t; }
 
   /* ------- 앱 전환 감지 (오탐 방지) [L2-09/L2-19] ------- */
-  var opened=false, fireTime=0, fallbackTimer=null, altTimer=null;
+  var opened=false, fireTime=0, fallbackTimer=null, altTimer=null, navAway=false;
   function clearTimers(){ if(fallbackTimer){clearTimeout(fallbackTimer);fallbackTimer=null;} if(altTimer){clearTimeout(altTimer);altTimer=null;} }
+  function goWeb(){ navAway=true; beacon("web_redirect"); try{ location.href=WEB; }catch(e){} } // 의도적 웹 이동 = 앱오픈 아님
   function markOpened(){
     if(opened) return;
+    if(navAway) return;                                              // ★ web 리다이렉트는 app_open 아님 (v2 오발사 차단)
     if(!fireTime || (Date.now()-fireTime) > CFG.OPEN_WINDOW) return; // 발사와 무관한 blur 무시 [L2-09]
     opened=true; clearTimers(); beacon("app_open"); setStatus("YouTube 앱에서 재생 중…",false);
   }
@@ -146,30 +148,30 @@ try{ fbq('init','938001189216764'); fbq('track','PageView'); }catch(e){}
     clearTimers();
     beacon(viaTap ? "tap" : "auto");
 
-    if(!isMobile){ location.href=WEB; return; }                          // 데스크톱 → 웹
+    if(!isMobile){ goWeb(); return; }                                    // 데스크톱 → 웹 (앱오픈 아님)
 
     if(isAndroid){                                                       // intent가 앱 열거나 browser_fallback_url로 웹
       beacon("android_auto");
-      fallbackTimer=setTimeout(function(){ if(!opened && !document.hidden){ beacon("fallback_web"); location.href=WEB; } }, inApp?1200:1600);
-      location.href = androidIntent(); return;
+      fallbackTimer=setTimeout(function(){ if(!opened && !document.hidden){ beacon("fallback_web"); goWeb(); } }, inApp?1200:1600);
+      location.href = androidIntent(); return;                          // 앱 열리면 markOpened가 app_open(정상); 미설치 폴백만 web
     }
 
-    if(isIOS && inApp){                                                  // ★ 핵심 변경: iOS 인앱 = 탭 없이 즉시 YouTube로
+    if(isIOS && inApp){                                                  // ★ iOS 인앱 = 탭 없이 즉시 웹 재생(앱 못 엶) → app_open 아님
       beacon("inapp_ios_auto");
-      setTimeout(function(){ if(!opened && !document.hidden){ location.href=WEB; } }, 350);  // 비콘 발사 후 즉시 이동(탭 제거)
+      setTimeout(function(){ if(!opened && !document.hidden){ goWeb(); } }, 350);  // 비콘 후 웹 이동(앱오픈으로 집계 안 함)
       return;
     }
 
     // iOS Safari 등 일반: 스킴이 앱 열 수 있음 → 자동 시도 + 폴백
     window.location.href = iosScheme();
     altTimer=setTimeout(function(){ if(!opened && !document.hidden){ window.location.href=iosAlt(); } }, CFG.ALT_MS);
-    fallbackTimer=setTimeout(function(){ if(!opened && !document.hidden){ beacon("fallback_web"); location.href=WEB; } }, CFG.FALLBACK_MS);
+    fallbackTimer=setTimeout(function(){ if(!opened && !document.hidden){ beacon("fallback_web"); goWeb(); } }, CFG.FALLBACK_MS);
   }
 
   function onTap(e){ if(e&&e.cancelable) e.preventDefault(); go(true); }  // 백스톱(자동 실패/복귀자 대비)
   $("playBtn").addEventListener("click",onTap);
   $("thumbLink").addEventListener("click",onTap);
-  webAlt.addEventListener("click",function(e){ e.preventDefault(); beacon("manual_web"); location.href=WEB; }); // [L2-20] 항상 가능
+  webAlt.addEventListener("click",function(e){ e.preventDefault(); beacon("manual_web"); navAway=true; location.href=WEB; }); // [L2-20] 항상 가능
 
   /* 복귀(뒤로가기) 시 무한 재발사 금지 — 버튼만 노출 [L2-16] */
   window.addEventListener("pageshow",function(ev){
