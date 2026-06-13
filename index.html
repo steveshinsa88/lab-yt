@@ -105,10 +105,18 @@ try{ fbq('init','938001189216764'); fbq('track','PageView'); }catch(e){}
       +"#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url="+encodeURIComponent(WEB)+";end";
   }
 
-  /* ------- 측정 [L2-09/10/24] ------- */
+  /* ---- 측정 [L2-09/10/24]: Pixel(client) + CAPI(server, sendBeacon→Worker) 이중 신호 + dedup ---- */
+  function genId(){ try{ return crypto.randomUUID(); }catch(e){ return Date.now()+"-"+Math.floor(Math.random()*1e9); } }
+  function getCookie(n){ var m=document.cookie.match("(^|;)\\s*"+n+"\\s*=\\s*([^;]+)"); return m?m.pop():""; }
+  function getFbc(){ var c=getCookie("_fbc"); if(c) return c; var f=new URLSearchParams(location.search).get("fbclid"); return f?("fb.1."+Date.now()+"."+f):""; }
   function beacon(ev){
-    var p={ev:ev,platform:isIOS?"ios":isAndroid?"android":"desktop",inApp:inApp,q:qs};
-    try{ if(window.fbq) fbq('trackCustom', ev==='app_open'?'YTAppOpen':('YTBridge_'+ev), p); }catch(e){}
+    var id=genId();
+    var name = ev==="app_open" ? "YTAppOpen" : ("YTBridge_"+ev);
+    var p={ev:ev,event_id:id,platform:isIOS?"ios":isAndroid?"android":"desktop",inApp:inApp,q:qs,
+           url:location.href,fbp:getCookie("_fbp"),fbc:getFbc()};
+    // Pixel(client) — eventID로 CAPI와 중복제거(dedup)
+    try{ if(window.fbq) fbq("trackCustom", name, {platform:p.platform,in_app:inApp}, {eventID:id}); }catch(e){}
+    // CAPI(server) — sendBeacon은 앱 전환/언로드 시에도 전송 보존 (app_open 신호의 핵심)
     try{ if(CFG.BEACON_URL && navigator.sendBeacon) navigator.sendBeacon(CFG.BEACON_URL, JSON.stringify(p)); }catch(e){}
     try{ console.log("[bridge]",ev,p); }catch(e){}
   }
