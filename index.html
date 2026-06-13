@@ -142,11 +142,25 @@ try{ fbq('init','938001189216764'); fbq('track','PageView'); }catch(e){}
     if(!isMobile){ location.href=WEB; return; }                 // [L2-05] 데스크톱→웹
     fireTime=Date.now();
     clearTimers();
-    // 폴백: 앱 안 열리면 웹으로 (성공 시 markOpened가 취소) [L2-03/L2-19]
+
+    // [미세최적화] 인스타/페북 인앱 웹뷰는 youtube:// 스킴을 막음(L2-01).
+    // iOS 인앱: 실패할 스킴으로 2.5초 멈칫하지 말고 곧장 YouTube 재생화면으로 → 거기서 재생 탭 = 앱 열림+카운트.
+    if(inApp && isIOS){
+      setStatus("YouTube로 이동합니다 — <b>재생 버튼</b>을 눌러주세요",true);   // [L2-23]
+      beacon("inapp_ios_web"); location.href=WEB; return;
+    }
+    // Android 인앱: intent가 앱을 열 수도 있으니 짧게(0.8s)만 시도 후 폴백
+    if(inApp && isAndroid){
+      fallbackTimer=setTimeout(function(){
+        if(!opened && !document.hidden){ beacon("fallback_web"); setStatus("YouTube로 이동합니다 — <b>재생 버튼</b>을 눌러주세요",true); location.href=WEB; }
+      }, 800);
+      location.href = androidIntent(); return;
+    }
+
+    // 일반 브라우저(Safari/Chrome 등): 스킴이 앱을 1탭에 여는 게 정상 → 정규 시도 + 폴백
     fallbackTimer=setTimeout(function(){
       if(!opened && !document.hidden){ beacon("fallback_web"); setStatus("재생 페이지로 이동합니다 — <b>재생 버튼</b>을 눌러주세요",true); location.href=WEB; } // [L2-23]
     }, CFG.FALLBACK_MS);
-
     if(isAndroid){
       location.href = androidIntent();                          // [L2-04] 동기 발사
     } else { // iOS — 동기 발사 후, 안 열리면 보조 스킴 [L2-14]
