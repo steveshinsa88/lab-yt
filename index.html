@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer-when-downgrade"><!-- [L2-22] 오가닉 origin 유지 -->
+<title>FIFTY FIFTY — Like a Bubble</title>
+
+<!-- [L2-24] Meta Pixel 부트스트랩 (async). 없으면 app_open 신호가 안 나감 → 최적화 굶음 -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+try{ fbq('init','938001189216764'); fbq('track','PageView'); }catch(e){}
+</script>
+
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:#0a0a0a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100dvh;padding:24px;text-align:center;-webkit-tap-highlight-color:transparent;
+  }
+  .wrap{width:100%;max-width:420px;display:flex;flex-direction:column;align-items:center;gap:16px}
+  .thumb{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#111;display:block}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.18)}
+  .thumb .tri{width:0;height:0;border-style:solid;border-width:18px 0 18px 30px;border-color:transparent transparent transparent #fff;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));margin-left:6px}
+  .title{font-size:19px;font-weight:600;line-height:1.35}
+  .sub{font-size:14px;color:#b9b9b9;line-height:1.5}
+  .btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:17px 20px;border:0;border-radius:13px;background:#ff0000;color:#fff;font-size:18px;font-weight:700;cursor:pointer;text-decoration:none;box-shadow:0 6px 20px rgba(255,0,0,.35)}
+  .btn:active{transform:scale(.985)}
+  .btn svg{width:24px;height:24px;fill:#fff;flex:none}
+  .status{font-size:13px;color:#8a8a8a;min-height:18px}
+  .alt{font-size:13px;color:#7aa7ff;text-decoration:underline;cursor:pointer}
+  .escape{display:none;width:100%;background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:13px 15px;font-size:13px;color:#d8d8d8;line-height:1.6;text-align:left}
+  .escape b{color:#fff}
+  .spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;display:inline-block;vertical-align:-2px;margin-right:6px;animation:s .8s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- [L2-13] 정적 href = 완전한 watch URL → JS 실패/차단/비활성이어도 탭하면 카운트되는 웹으로 -->
+    <a class="thumb" id="thumbLink" href="https://www.youtube.com/watch?v=iZzpq5iqevg&list=RDiZzpq5iqevg&start_radio=1" aria-label="YouTube에서 재생">
+      <img id="thumb" alt="FIFTY FIFTY - Like a Bubble" width="420" height="236" fetchpriority="high"
+           src="https://i.ytimg.com/vi/iZzpq5iqevg/hqdefault.jpg"
+           onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/iZzpq5iqevg/mqdefault.jpg'"><!-- [L2-18] 가벼운 썸네일 + 폴백 -->
+      <span class="ov"><span class="tri"></span></span>
+    </a>
+    <div class="title">FIFTY FIFTY — &lsquo;Like a Bubble&rsquo;</div>
+    <div class="sub" id="sub">YouTube 앱에서 뮤직비디오가 바로 재생됩니다.</div>
+    <a class="btn" id="playBtn" href="https://www.youtube.com/watch?v=iZzpq5iqevg&list=RDiZzpq5iqevg&start_radio=1" rel="noopener">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      <span>YouTube에서 재생</span>
+    </a>
+    <!-- [L2-01/L2-12/L2-17] 인앱 브라우저 탈출 안내 (인앱일 때만 노출) -->
+    <div class="escape" id="escape"></div>
+    <!-- [L2-20] 타이머에 의존하지 않는, 항상 보이는 수동 탈출 -->
+    <a class="alt" id="webAlt" href="https://www.youtube.com/watch?v=iZzpq5iqevg&list=RDiZzpq5iqevg&start_radio=1">또는 브라우저에서 보기</a>
+    <div class="status" id="status"></div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ======================= CONFIG (곡 바뀌면 여기만) ======================= */
+  var CFG = {
+    VIDEO_ID:"iZzpq5iqevg", LIST:"RDiZzpq5iqevg", START_RADIO:"1",
+    FALLBACK_MS:2500,   // 앱 안 열리면 웹으로
+    ALT_MS:1200,        // iOS 보조 스킴 재시도 시점
+    OPEN_WINDOW:3200,   // [L2-09] 스킴 발사 후 이 시간 내 hidden만 "앱오픈"으로 인정 (오탐 방지)
+    BEACON_URL:"",      // (선택) 서버 수집 엔드포인트. 채우면 sendBeacon + (서버에서 CAPI 권장)
+    META_PIXEL_ID:"938001189216764"
+  };
+
+  var qs = location.search ? location.search.slice(1) : "";
+  function webURL(){
+    var u="https://www.youtube.com/watch?v="+CFG.VIDEO_ID+"&list="+CFG.LIST+"&start_radio="+CFG.START_RADIO;
+    if(qs) u+="&"+qs;                 // [L2-10] UTM/fbclid 패스스루
+    return u;
+  }
+  var WEB = webURL();
+
+  /* ------- 플랫폼 + 인앱 브라우저 감지 [L2-01/04/05/11/12] ------- */
+  var ua = navigator.userAgent||"";
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+  var isAndroid = /Android/.test(ua);
+  var isMobile = isIOS||isAndroid;
+  var inApp = /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Line\/|KAKAOTALK|NAVER|DaumApps|Snapchat|Twitter|musical_ly|TikTok/i.test(ua);
+
+  /* ------- 딥링크 빌더 ------- */
+  function iosScheme(){ return "youtube://www.youtube.com/watch?v="+CFG.VIDEO_ID+"&list="+CFG.LIST+"&start_radio="+CFG.START_RADIO; }
+  function iosAlt(){ return "vnd.youtube://www.youtube.com/watch?v="+CFG.VIDEO_ID+"&list="+CFG.LIST+"&start_radio="+CFG.START_RADIO; } // [L2-14] list 유지
+  function androidIntent(){
+    return "intent://www.youtube.com/watch?v="+CFG.VIDEO_ID+"&list="+CFG.LIST+"&start_radio="+CFG.START_RADIO
+      +"#Intent;scheme=https;package=com.google.android.youtube;S.browser_fallback_url="+encodeURIComponent(WEB)+";end"; // [L2-04]
+  }
+  function androidChrome(){ // [L2-12] 인앱 웹뷰 탈출: Chrome로 열기
+    return "intent://www.youtube.com/watch?v="+CFG.VIDEO_ID+"&list="+CFG.LIST+"&start_radio="+CFG.START_RADIO
+      +"#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url="+encodeURIComponent(WEB)+";end";
+  }
+
+  /* ------- 측정 [L2-09/10/24] ------- */
+  function beacon(ev){
+    var p={ev:ev,platform:isIOS?"ios":isAndroid?"android":"desktop",inApp:inApp,q:qs};
+    try{ if(window.fbq) fbq('trackCustom', ev==='app_open'?'YTAppOpen':('YTBridge_'+ev), p); }catch(e){}
+    try{ if(CFG.BEACON_URL && navigator.sendBeacon) navigator.sendBeacon(CFG.BEACON_URL, JSON.stringify(p)); }catch(e){}
+    try{ console.log("[bridge]",ev,p); }catch(e){}
+  }
+
+  var $=function(id){return document.getElementById(id);};
+  var statusEl=$("status"), subEl=$("sub"), escapeEl=$("escape"), webAlt=$("webAlt");
+  function setStatus(t,spin){ statusEl.innerHTML=(spin?'<span class="spin"></span>':'')+t; }
+
+  /* ------- 앱 전환 감지 (오탐 방지) [L2-09/L2-19] ------- */
+  var opened=false, fireTime=0, fallbackTimer=null, altTimer=null;
+  function clearTimers(){ if(fallbackTimer){clearTimeout(fallbackTimer);fallbackTimer=null;} if(altTimer){clearTimeout(altTimer);altTimer=null;} }
+  function markOpened(){
+    if(opened) return;
+    if(!fireTime || (Date.now()-fireTime) > CFG.OPEN_WINDOW) return; // 발사와 무관한 blur 무시 [L2-09]
+    opened=true; clearTimers(); beacon("app_open"); setStatus("YouTube 앱에서 재생 중…",false);
+  }
+  document.addEventListener("visibilitychange",function(){ if(document.hidden) markOpened(); });
+  window.addEventListener("pagehide",markOpened);
+  window.addEventListener("blur",markOpened);
+
+  /* ------- 핵심: 앱 열기 (반드시 사용자 탭에서 동기 발사) [L2-02] ------- */
+  function fireScheme(){
+    if(!isMobile){ location.href=WEB; return; }                 // [L2-05] 데스크톱→웹
+    fireTime=Date.now();
+    clearTimers();
+    // 폴백: 앱 안 열리면 웹으로 (성공 시 markOpened가 취소) [L2-03/L2-19]
+    fallbackTimer=setTimeout(function(){
+      if(!opened && !document.hidden){ beacon("fallback_web"); setStatus("재생 페이지로 이동합니다 — <b>재생 버튼</b>을 눌러주세요",true); location.href=WEB; } // [L2-23]
+    }, CFG.FALLBACK_MS);
+
+    if(isAndroid){
+      location.href = androidIntent();                          // [L2-04] 동기 발사
+    } else { // iOS — 동기 발사 후, 안 열리면 보조 스킴 [L2-14]
+      window.location.href = iosScheme();
+      altTimer=setTimeout(function(){ if(!opened && !document.hidden){ window.location.href=iosAlt(); } }, CFG.ALT_MS);
+    }
+  }
+
+  function onTap(e){ if(e&&e.cancelable) e.preventDefault(); beacon("tap"); setStatus("YouTube 앱 여는 중…",true); fireScheme(); }
+  $("playBtn").addEventListener("click",onTap);
+  $("thumbLink").addEventListener("click",onTap);
+  webAlt.addEventListener("click",function(e){ e.preventDefault(); beacon("manual_web"); location.href=WEB; }); // [L2-20] 항상 가능
+
+  /* ------- 인앱 브라우저 탈출 안내 [L2-01/L2-12/L2-17] ------- */
+  function showEscape(){
+    if(!inApp) return;
+    if(isIOS){
+      escapeEl.innerHTML="앱이 안 열리면 → 화면 <b>오른쪽 위 ⋯ </b> 메뉴 → <b>‘Safari로 열기’</b> 후 다시 재생을 누르세요. (인스타·페북 인앱 화면에선 막힐 수 있어요)";
+      escapeEl.style.display="block";
+    } else if(isAndroid){
+      escapeEl.innerHTML="앱이 안 열리면 → 아래 <b>‘Chrome에서 열기’</b>를 누르세요.";
+      escapeEl.style.display="block";
+      var b=document.createElement("a");
+      b.className="alt"; b.style.marginTop="8px"; b.style.display="inline-block";
+      b.textContent="Chrome에서 열기 ▶"; b.href="#";
+      b.addEventListener("click",function(e){ e.preventDefault(); beacon("android_chrome"); location.href=androidChrome(); });
+      escapeEl.appendChild(document.createElement("br")); escapeEl.appendChild(b);
+    }
+  }
+
+  /* ------- 복귀(뒤로가기) 시 무한 재발사 금지 [L2-16] ------- */
+  window.addEventListener("pageshow",function(ev){
+    if(ev && ev.persisted){ opened=false; fireTime=0; setStatus("다시 재생하려면 버튼을 누르세요",false); }
+  });
+
+  /* ------- 부팅 ------- */
+  beacon("load");
+  showEscape();
+  if(isIOS){ setStatus("아래 빨간 버튼을 눌러 재생",false); }      // iOS는 제스처 필수 → 자동발사 안 함 [L2-02]
+  else if(isAndroid){ if(!inApp){ setStatus("YouTube 앱 여는 중…",true); fireScheme(); } else { setStatus("아래 버튼을 눌러 재생",false); } } // 인앱 안드로이드는 탭 유도 [L2-12]
+  else { location.href=WEB; }                                    // 데스크톱 즉시 웹 [L2-05]
+})();
+</script>
+</body>
+</html>
