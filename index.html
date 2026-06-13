@@ -74,7 +74,7 @@ try{ fbq('init','938001189216764'); fbq('track','PageView'); }catch(e){}
     FALLBACK_MS:2500,   // 앱 안 열리면 웹으로
     ALT_MS:1200,        // iOS 보조 스킴 재시도 시점
     OPEN_WINDOW:3200,   // [L2-09] 스킴 발사 후 이 시간 내 hidden만 "앱오픈"으로 인정 (오탐 방지)
-    BEACON_URL:"",      // (선택) 서버 수집 엔드포인트. 채우면 sendBeacon + (서버에서 CAPI 권장)
+    BEACON_URL:"https://ff-capi.steve-shin.workers.dev/",  // CAPI 수집 Worker (sendBeacon → 서버사이드 CAPI 포워딩)
     META_PIXEL_ID:"938001189216764"
   };
 
