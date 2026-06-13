@@ -137,71 +137,49 @@ try{ fbq('init','938001189216764'); fbq('track','PageView'); }catch(e){}
   window.addEventListener("pagehide",markOpened);
   window.addEventListener("blur",markOpened);
 
-  /* ------- 핵심: 앱 열기 (반드시 사용자 탭에서 동기 발사) [L2-02] ------- */
-  function fireScheme(){
-    if(!isMobile){ location.href=WEB; return; }                 // [L2-05] 데스크톱→웹
+  /* ===== v2: 자동 이동 (탭 불필요). 가설검증 = '의무 탭'이 전환 누수였나 =====
+     이전(v1): 사용자가 빨간 버튼을 탭해야 진행 → load→tap 0.5% 누수.
+     v2: 로드 즉시 자동으로 YouTube로 라우팅. 탭은 백스톱(자동 실패/복귀자)만. */
+  function go(viaTap){
+    if(opened) return;
     fireTime=Date.now();
     clearTimers();
+    beacon(viaTap ? "tap" : "auto");
 
-    // [미세최적화] 인스타/페북 인앱 웹뷰는 youtube:// 스킴을 막음(L2-01).
-    // iOS 인앱: 실패할 스킴으로 2.5초 멈칫하지 말고 곧장 YouTube 재생화면으로 → 거기서 재생 탭 = 앱 열림+카운트.
-    if(inApp && isIOS){
-      setStatus("YouTube로 이동합니다 — <b>재생 버튼</b>을 눌러주세요",true);   // [L2-23]
-      beacon("inapp_ios_web"); location.href=WEB; return;
-    }
-    // Android 인앱: intent가 앱을 열 수도 있으니 짧게(0.8s)만 시도 후 폴백
-    if(inApp && isAndroid){
-      fallbackTimer=setTimeout(function(){
-        if(!opened && !document.hidden){ beacon("fallback_web"); setStatus("YouTube로 이동합니다 — <b>재생 버튼</b>을 눌러주세요",true); location.href=WEB; }
-      }, 800);
+    if(!isMobile){ location.href=WEB; return; }                          // 데스크톱 → 웹
+
+    if(isAndroid){                                                       // intent가 앱 열거나 browser_fallback_url로 웹
+      beacon("android_auto");
+      fallbackTimer=setTimeout(function(){ if(!opened && !document.hidden){ beacon("fallback_web"); location.href=WEB; } }, inApp?1200:1600);
       location.href = androidIntent(); return;
     }
 
-    // 일반 브라우저(Safari/Chrome 등): 스킴이 앱을 1탭에 여는 게 정상 → 정규 시도 + 폴백
-    fallbackTimer=setTimeout(function(){
-      if(!opened && !document.hidden){ beacon("fallback_web"); setStatus("재생 페이지로 이동합니다 — <b>재생 버튼</b>을 눌러주세요",true); location.href=WEB; } // [L2-23]
-    }, CFG.FALLBACK_MS);
-    if(isAndroid){
-      location.href = androidIntent();                          // [L2-04] 동기 발사
-    } else { // iOS — 동기 발사 후, 안 열리면 보조 스킴 [L2-14]
-      window.location.href = iosScheme();
-      altTimer=setTimeout(function(){ if(!opened && !document.hidden){ window.location.href=iosAlt(); } }, CFG.ALT_MS);
+    if(isIOS && inApp){                                                  // ★ 핵심 변경: iOS 인앱 = 탭 없이 즉시 YouTube로
+      beacon("inapp_ios_auto");
+      setTimeout(function(){ if(!opened && !document.hidden){ location.href=WEB; } }, 350);  // 비콘 발사 후 즉시 이동(탭 제거)
+      return;
     }
+
+    // iOS Safari 등 일반: 스킴이 앱 열 수 있음 → 자동 시도 + 폴백
+    window.location.href = iosScheme();
+    altTimer=setTimeout(function(){ if(!opened && !document.hidden){ window.location.href=iosAlt(); } }, CFG.ALT_MS);
+    fallbackTimer=setTimeout(function(){ if(!opened && !document.hidden){ beacon("fallback_web"); location.href=WEB; } }, CFG.FALLBACK_MS);
   }
 
-  function onTap(e){ if(e&&e.cancelable) e.preventDefault(); beacon("tap"); setStatus("YouTube 앱 여는 중…",true); fireScheme(); }
+  function onTap(e){ if(e&&e.cancelable) e.preventDefault(); go(true); }  // 백스톱(자동 실패/복귀자 대비)
   $("playBtn").addEventListener("click",onTap);
   $("thumbLink").addEventListener("click",onTap);
   webAlt.addEventListener("click",function(e){ e.preventDefault(); beacon("manual_web"); location.href=WEB; }); // [L2-20] 항상 가능
 
-  /* ------- 인앱 브라우저 탈출 안내 [L2-01/L2-12/L2-17] ------- */
-  function showEscape(){
-    if(!inApp) return;
-    if(isIOS){
-      escapeEl.innerHTML="앱이 안 열리면 → 화면 <b>오른쪽 위 ⋯ </b> 메뉴 → <b>‘Safari로 열기’</b> 후 다시 재생을 누르세요. (인스타·페북 인앱 화면에선 막힐 수 있어요)";
-      escapeEl.style.display="block";
-    } else if(isAndroid){
-      escapeEl.innerHTML="앱이 안 열리면 → 아래 <b>‘Chrome에서 열기’</b>를 누르세요.";
-      escapeEl.style.display="block";
-      var b=document.createElement("a");
-      b.className="alt"; b.style.marginTop="8px"; b.style.display="inline-block";
-      b.textContent="Chrome에서 열기 ▶"; b.href="#";
-      b.addEventListener("click",function(e){ e.preventDefault(); beacon("android_chrome"); location.href=androidChrome(); });
-      escapeEl.appendChild(document.createElement("br")); escapeEl.appendChild(b);
-    }
-  }
-
-  /* ------- 복귀(뒤로가기) 시 무한 재발사 금지 [L2-16] ------- */
+  /* 복귀(뒤로가기) 시 무한 재발사 금지 — 버튼만 노출 [L2-16] */
   window.addEventListener("pageshow",function(ev){
-    if(ev && ev.persisted){ opened=false; fireTime=0; setStatus("다시 재생하려면 버튼을 누르세요",false); }
+    if(ev && ev.persisted){ opened=false; fireTime=0; setStatus("다시 보려면 아래 버튼을 누르세요",false); }
   });
 
-  /* ------- 부팅 ------- */
+  /* ------- 부팅 (v2: 모든 플랫폼 자동 이동, 탭 불필요) ------- */
   beacon("load");
-  showEscape();
-  if(isIOS){ setStatus("아래 빨간 버튼을 눌러 재생",false); }      // iOS는 제스처 필수 → 자동발사 안 함 [L2-02]
-  else if(isAndroid){ if(!inApp){ setStatus("YouTube 앱 여는 중…",true); fireScheme(); } else { setStatus("아래 버튼을 눌러 재생",false); } } // 인앱 안드로이드는 탭 유도 [L2-12]
-  else { location.href=WEB; }                                    // 데스크톱 즉시 웹 [L2-05]
+  setStatus("YouTube로 이동 중…",true);
+  go(false);
 })();
 </script>
 </body>
